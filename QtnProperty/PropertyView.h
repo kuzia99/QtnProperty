@@ -79,6 +79,10 @@ public:
 	QtnPropertyBase *getPropertyAt(
 		const QPoint &position, QRect *out_rect = nullptr);
 
+	// Drag&drop helper: draw insertion indicator line during external drag logic.
+	void setDropIndicator(const QRect &itemRect, bool insertAfter);
+	void clearDropIndicator();
+
 	void connectPropertyToEdit(
 		QtnPropertyBase *property, QtnConnections &outConnections);
 	int valueLeftMargin() const;
@@ -128,6 +132,11 @@ private:
 	Item *createItemsTree(QtnPropertyBase *rootProperty);
 
 	void setActivePropertyInternal(QtnPropertyBase *property);
+
+	// drop indicator (painted on top of items)
+	bool m_dropIndicatorVisible = false;
+	QRect m_dropIndicatorItemRect;
+	bool m_dropIndicatorAfter = false;
 
 	void invalidateVisibleItems();
 	void validateVisibleItems() const;

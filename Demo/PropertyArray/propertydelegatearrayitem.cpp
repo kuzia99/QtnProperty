@@ -80,7 +80,9 @@ static void drawToolButton(QtnPropertyDelegateArrayItem* delegate,
     option.features = QStyleOptionToolButton::None;
     option.subControls = QStyle::SC_ToolButton;
     option.activeSubControls = QStyle::SC_ToolButton;
-    option.toolButtonStyle = Qt::ToolButtonIconOnly;
+    option.toolButtonStyle = icon.availableSizes().empty()
+        ? Qt::ToolButtonTextOnly
+        : Qt::ToolButtonIconOnly;
     option.rect = item.rect;
     option.arrowType = Qt::NoArrow;
     if (!icon.availableSizes().empty())
@@ -99,9 +101,9 @@ static void drawToolButton(QtnPropertyDelegateArrayItem* delegate,
 void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
     QtnDrawContext& context, const QRect& valueRect, QList<QtnSubItem>& subItems)
 {
-    // Reserve space for drag handle + 3 buttons: [drag][up][down][remove]
+    // Reserve space for drag handle + 1 button: [drag][remove]
     const int h = valueRect.height();
-    const int buttonsCount = 4;
+    const int buttonsCount = 2;
     const int buttonsWidth = h * buttonsCount;
 
     QRect valueOnlyRect = valueRect;
@@ -114,9 +116,6 @@ void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
     auto master = property()->getMasterProperty();
     auto arrayProp = qobject_cast<QtnPropertyArrayBase*>(master);
     const int size = arrayProp ? (int)arrayProp->value().m_vecData.size() : 0;
-
-    const bool canMoveUp = arrayProp && (m_index > 0) && (m_index < size);
-    const bool canMoveDown = arrayProp && (m_index >= 0) && (m_index + 1 < size);
     const bool canRemove = arrayProp && (m_index >= 0) && (m_index < size);
 
     QRect buttonsRect = valueRect;
@@ -154,6 +153,7 @@ void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
                         return false;
                     m_dragStartPos = me->pos();
                     m_dragging = false;
+                    ev.widget->clearDropIndicator();
                     return true;
                 }
 
@@ -173,6 +173,18 @@ void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
                         m_dragging = true;
                         ev.widget->viewport()->setCursor(Qt::ClosedHandCursor);
                     }
+
+                    // Update drop indicator while dragging.
+                    QRect targetRect;
+                    QtnPropertyBase* target = ev.widget->getPropertyAt(me->pos(), &targetRect);
+                    if (target && target->getMasterProperty() == arrayProp)
+                    {
+                        const bool after = me->pos().y() > targetRect.center().y();
+                        ev.widget->setDropIndicator(targetRect, after);
+                    } else
+                    {
+                        ev.widget->clearDropIndicator();
+                    }
                     return true;
                 }
 
@@ -183,6 +195,7 @@ void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
 
                     m_dragging = false;
                     ev.widget->viewport()->unsetCursor();
+                    ev.widget->clearDropIndicator();
 
                     // Drop position -> find target property and compute target index.
                     auto me = ev.eventAs<QtnSubItemEvent>();
@@ -283,19 +296,7 @@ void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
 
     // Icons: use standard style pixmaps
     auto style = context.style();
-    const QIcon iconUp = style->standardIcon(QStyle::SP_ArrowUp, nullptr, context.widget);
-    const QIcon iconDown = style->standardIcon(QStyle::SP_ArrowDown, nullptr, context.widget);
     const QIcon iconRemove = style->standardIcon(QStyle::SP_DialogCloseButton, nullptr, context.widget);
-
-    addBtn(2, QtnPropertyView::tr("Переместить вверх"), iconUp, canMoveUp, [arrayProp, idx = m_index, reason = editReason()]() {
-        if (arrayProp)
-            arrayProp->moveElement(idx, idx - 1, reason);
-    });
-
-    addBtn(1, QtnPropertyView::tr("Переместить вниз"), iconDown, canMoveDown, [arrayProp, idx = m_index, reason = editReason()]() {
-        if (arrayProp)
-            arrayProp->moveElement(idx, idx + 1, reason);
-    });
 
     addBtn(0, QtnPropertyView::tr("Удалить"), iconRemove, canRemove, [arrayProp, idx = m_index, reason = editReason()]() {
         if (arrayProp)

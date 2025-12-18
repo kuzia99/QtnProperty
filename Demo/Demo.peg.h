@@ -89,6 +89,7 @@ public:
     QtnPropertySetSamplePS& operator=(const QtnPropertySetSamplePS& other);
     
     // start children declarations
+    QtnPropertyArray& PropArr;
     QtnPropertyMyColor& myColor;
     QtnPropertyBool& BoolProperty;
     QtnPropertyButton& ButtonProperty;
@@ -131,7 +132,6 @@ public:
     QtnPropertyQPen& PenProperty;
     QtnPropertyQString& QStringCallbackProperty;
     QtnPropertySetSubPropertySetType& SubPropertySet2;
-    QtnPropertyArray& PropArray;
     // end children declarations
 
 protected:

@@ -218,9 +218,9 @@ void QtnPropertySetSubPropertySetType::connectDelegates()
 
 QtnPropertySetSamplePS::QtnPropertySetSamplePS(QObject* parent)
     : QtnPropertySet(parent)
+    , PropArr(*qtnCreateProperty<QtnPropertyArray>(this))
     , myColor(*qtnCreateProperty<QtnPropertyMyColor>(this))
     , BoolProperty(*qtnCreateProperty<QtnPropertyBool>(this))
-    , PropArray(*qtnCreateProperty<QtnPropertyArray>(this))
     , ButtonProperty(*qtnCreateProperty<QtnPropertyButton>(this))
     , ButtonLinkProperty(*qtnCreateProperty<QtnPropertyButton>(this))
     , RGBColor(*qtnCreateProperty<QtnPropertyABColor>(this))
@@ -318,7 +318,6 @@ QtnPropertySetSamplePS& QtnPropertySetSamplePS::operator=(const QtnPropertySetSa
     PenProperty = other.PenProperty;
     QStringCallbackProperty = other.QStringCallbackProperty;
     SubPropertySet2 = other.SubPropertySet2;
-    // PropArray = other.PropArray;
 
     return *this;
 }
@@ -556,14 +555,6 @@ void QtnPropertySetSamplePS::init()
     setName(SamplePS_name);
     
     // start children initialization
-    PropArray.setName("PropArray");
-    PropArray.setDescription("PropArray description");
-    PropertyArray arr;
-    arr.m_vecData.push_back("aaa");
-    arr.m_vecData.push_back("bbb");
-    arr.m_vecData.push_back("bbb");
-    PropArray.setValue(arr);
-
     static QString myColor_name = QStringLiteral("myColor");
     myColor.setName(myColor_name);
     static QString myColor_description = "Property to hold MyColor values.";

@@ -360,6 +360,59 @@ void QtnPropertyView::paintEvent(QPaintEvent *e)
 		}
 		itemRect.translate(0, m_itemHeight);
 	}
+
+	// Draw drop indicator on top of items (used by custom drag logic).
+	if (m_dropIndicatorVisible && m_dropIndicatorItemRect.isValid())
+	{
+		painter.save();
+		const QColor c = palette().color(QPalette::Highlight);
+		{
+			QColor bg = c;
+			bg.setAlpha(40);
+			painter.fillRect(m_dropIndicatorItemRect, bg);
+		}
+		QPen pen(c);
+		pen.setWidth(2);
+		painter.setPen(pen);
+
+		const int y = m_dropIndicatorAfter
+			? m_dropIndicatorItemRect.bottom()
+			: m_dropIndicatorItemRect.top();
+
+		const int x1 = viewPortRect.left() + 4;
+		const int x2 = viewPortRect.right() - 4;
+		painter.drawLine(x1, y, x2, y);
+
+		// small end caps
+		painter.drawLine(x1, y - 3, x1, y + 3);
+		painter.drawLine(x2, y - 3, x2, y + 3);
+		painter.restore();
+	}
+}
+
+void QtnPropertyView::setDropIndicator(const QRect &itemRect, bool insertAfter)
+{
+	// itemRect is expected in viewport coordinates (see getPropertyAt()).
+	if (m_dropIndicatorVisible && m_dropIndicatorItemRect == itemRect &&
+		m_dropIndicatorAfter == insertAfter)
+	{
+		return;
+	}
+
+	m_dropIndicatorVisible = true;
+	m_dropIndicatorItemRect = itemRect;
+	m_dropIndicatorAfter = insertAfter;
+	viewport()->update();
+}
+
+void QtnPropertyView::clearDropIndicator()
+{
+	if (!m_dropIndicatorVisible)
+		return;
+
+	m_dropIndicatorVisible = false;
+	m_dropIndicatorItemRect = QRect();
+	viewport()->update();
 }
 
 void QtnPropertyView::drawItem(
