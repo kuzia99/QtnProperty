@@ -24,5 +24,9 @@ protected:
 
 private:
     int m_index = -1;
+
+    // drag&drop reorder state (handled by "grab handle" sub-item)
+    QPoint m_dragStartPos;
+    bool m_dragging = false;
 };
 

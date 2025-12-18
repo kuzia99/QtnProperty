@@ -4,6 +4,8 @@
 #include "QtnProperty/Delegates/PropertyDelegateFactory.h"
 #include "QtnProperty/PropertyView.h"
 
+#include <QApplication>
+#include <QMouseEvent>
 #include <QStyle>
 #include <functional>
 
@@ -97,9 +99,9 @@ static void drawToolButton(QtnPropertyDelegateArrayItem* delegate,
 void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
     QtnDrawContext& context, const QRect& valueRect, QList<QtnSubItem>& subItems)
 {
-    // Reserve space for 3 buttons: [up][down][remove]
+    // Reserve space for drag handle + 3 buttons: [drag][up][down][remove]
     const int h = valueRect.height();
-    const int buttonsCount = 3;
+    const int buttonsCount = 4;
     const int buttonsWidth = h * buttonsCount;
 
     QRect valueOnlyRect = valueRect;
@@ -121,6 +123,129 @@ void QtnPropertyDelegateArrayItem::createSubItemValuesImpl(
     buttonsRect.setLeft(valueOnlyRect.right() + 1);
     if (!buttonsRect.isValid())
         return;
+
+    // ---- drag handle (left-most button) ----
+    {
+        QtnSubItem dragItem(buttonsRect);
+        dragItem.rect.setWidth(h);
+        // left-most within buttonsRect
+        dragItem.rect.setLeft(buttonsRect.left());
+        dragItem.rect.setRight(dragItem.rect.left() + h - 1);
+        dragItem.trackState();
+        dragItem.setTextAsTooltip(QtnPropertyView::tr("Перетащить для сортировки"));
+
+        dragItem.drawHandler = [this](QtnDrawContext& ctx, const QtnSubItem& it) {
+            // Simple "grip" glyph. If you prefer an icon, we can switch to a style pixmap.
+            drawToolButton(this, ctx, it, QIcon(), QString::fromUtf8("\xE2\x89\xA1"), true); // "≡"
+        };
+
+        dragItem.eventHandler = [this, arrayProp](QtnEventContext& ev,
+                                 const QtnSubItem&, QtnPropertyToEdit*) -> bool {
+            if (!arrayProp)
+                return false;
+
+            switch (ev.eventType())
+            {
+                case QEvent::MouseButtonPress:
+                case QEvent::MouseButtonDblClick:
+                {
+                    auto me = ev.eventAs<QMouseEvent>();
+                    if (me->button() != Qt::LeftButton)
+                        return false;
+                    m_dragStartPos = me->pos();
+                    m_dragging = false;
+                    return true;
+                }
+
+                case QEvent::MouseMove:
+                {
+                    auto me = ev.eventAs<QMouseEvent>();
+                    if (!(me->buttons() & Qt::LeftButton))
+                        return false;
+
+                    if (!m_dragging)
+                    {
+                        if ((me->pos() - m_dragStartPos).manhattanLength() <
+                            QApplication::startDragDistance())
+                        {
+                            return true;
+                        }
+                        m_dragging = true;
+                        ev.widget->viewport()->setCursor(Qt::ClosedHandCursor);
+                    }
+                    return true;
+                }
+
+                case QtnSubItemEvent::ReleaseMouse:
+                {
+                    if (!m_dragging)
+                        return true; // click without move
+
+                    m_dragging = false;
+                    ev.widget->viewport()->unsetCursor();
+
+                    // Drop position -> find target property and compute target index.
+                    auto me = ev.eventAs<QtnSubItemEvent>();
+                    const QPoint pos = me ? me->pos() : QPoint();
+                    QRect targetRect;
+                    QtnPropertyBase* target = ev.widget->getPropertyAt(pos, &targetRect);
+                    if (!target)
+                        return true;
+
+                    // Only reorder within the same array.
+                    if (target != arrayProp && target->getMasterProperty() != arrayProp)
+                        return true;
+
+                    int targetIndex = -1;
+                    if (target == arrayProp)
+                    {
+                        // dropped on the array header -> append
+                        targetIndex = (int)arrayProp->value().m_vecData.size() - 1;
+                        targetRect = QRect(); // treat as "after"
+                    } else
+                    {
+                        const auto info = target->delegateInfo();
+                        if (!info)
+                            return true;
+                        targetIndex = info->getAttribute<int>(qtnArrayIndexAttr(), -1);
+                        if (targetIndex < 0)
+                            return true;
+                    }
+
+                    const int size = (int)arrayProp->value().m_vecData.size();
+                    if (m_index < 0 || m_index >= size)
+                        return true;
+
+                    // insert position: before/after depending on cursor in row
+                    int insertPos = targetIndex;
+                    if (!targetRect.isValid() || pos.y() > targetRect.center().y())
+                        insertPos = targetIndex + 1;
+
+                    if (insertPos > size)
+                        insertPos = size;
+
+                    // convert "insertPos" to resulting index after removing 'from'
+                    int to = insertPos;
+                    if (m_index < to)
+                        to -= 1;
+                    if (to < 0)
+                        to = 0;
+                    if (to >= size)
+                        to = size - 1;
+
+                    arrayProp->moveElement(m_index, to, editReason());
+                    return true;
+                }
+
+                default:
+                    break;
+            }
+
+            return false;
+        };
+
+        subItems.append(dragItem);
+    }
 
     auto addBtn = [&](int orderFromRight, const QString& tooltip, const QIcon& icon,
                       bool enabled, std::function<void()> action)
