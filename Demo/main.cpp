@@ -6,6 +6,7 @@ void regIntListDelegates();
 void regLayerDelegates();
 void regPenWidthDelegates();
 void regFreqDelegates();
+void regArrayDelegate();
 
 int main(int argc, char *argv[])
 {
@@ -14,6 +15,7 @@ int main(int argc, char *argv[])
     regLayerDelegates();
     regPenWidthDelegates();
     regFreqDelegates();
+    regArrayDelegate();
 
     QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QApplication a(argc, argv);

@@ -9,6 +9,8 @@ TEMPLATE = app
 
 SOURCES +=  main.cpp\
             MainWindow.cpp \
+            PropertyArray/propertyarray.cpp \
+            PropertyArray/propertydelegatearray.cpp \
             mydialog.cpp \
             AB/PropertyABColor.cpp \
             AB/PropertyDelegateABColor.cpp \
@@ -21,6 +23,8 @@ SOURCES +=  main.cpp\
             Freq/PropertyDelegateFreq.cpp
 
 HEADERS  += MainWindow.h \
+            PropertyArray/propertyarray.h \
+            PropertyArray/propertydelegatearray.h \
             mydialog.h \
             AB/PropertyABColor.h \
             AB/PropertyDelegateABColor.h \

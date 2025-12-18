@@ -46,6 +46,8 @@ struct MyColor
     int red = 0;
     int green = 0;
     int blue = 0;
+
+bool operator==(const MyColor& rhs) const;
 };
 
 using QtnPropertyMyColorBase = QtnSinglePropertyBaseAs<QtnPropertyQColorBase, MyColor>;

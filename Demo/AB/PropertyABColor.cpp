@@ -41,3 +41,8 @@ bool QtnPropertyMyColor::toActualValue(ValueTypeStore& actualValue, BaseValueTyp
     actualValue.blue = baseValue.blue();
     return true;
 }
+
+bool MyColor::operator==(const MyColor &rhs) const
+{
+return blue == rhs.blue && green == rhs.green && red == rhs.red;
+}

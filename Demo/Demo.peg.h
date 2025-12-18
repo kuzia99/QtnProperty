@@ -10,6 +10,7 @@
 #include "PenWidth/PropertyPenWidth.h"
 #include "Freq/PropertyFreq.h"
 
+class QtnPropertyArray;
 class COLOR
 {
 public:
@@ -130,6 +131,7 @@ public:
     QtnPropertyQPen& PenProperty;
     QtnPropertyQString& QStringCallbackProperty;
     QtnPropertySetSubPropertySetType& SubPropertySet2;
+    QtnPropertyArray& PropArray;
     // end children declarations
 
 protected:
