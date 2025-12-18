@@ -36,12 +36,12 @@ public:
 
     QtnProperty* createItemProperty(size_t index);
 
-    PropertyArray array() const
-    {
-        return m_array;
-    }
-
-    void setArray(PropertyArray array);
+    void addElement(const QString& value,
+        QtnPropertyChangeReason reason = QtnPropertyChangeReasonNewValue);
+    void removeElement(int index,
+        QtnPropertyChangeReason reason = QtnPropertyChangeReasonNewValue);
+    void moveElement(int from, int to,
+        QtnPropertyChangeReason reason = QtnPropertyChangeReasonNewValue);
 
 protected:
     // string conversion implementation
@@ -50,9 +50,6 @@ protected:
     bool toStrImpl(QString& str) const override;
 
     P_PROPERTY_DECL_MEMBER_OPERATORS(QtnPropertyArrayBase)
-private:
-    PropertyArray m_array;
-
 };
 
 P_PROPERTY_DECL_EQ_OPERATORS(QtnPropertyArrayBase, PropertyArray)

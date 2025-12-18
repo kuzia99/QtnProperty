@@ -1,4 +1,5 @@
 #include "propertyarray.h"
+#include "QtnProperty/Auxiliary/PropertyDelegateInfo.h"
 
 PropertyArray::PropertyArray() {}
 
@@ -29,6 +30,12 @@ QtnProperty* QtnPropertyArrayBase::createItemProperty(size_t index)
     result->setDisplayName("index " + QString::number(index) + " DisplayName");
     result->setName(QString::number(index) + " Name");
     result->setDescription(QString::number(index) + " description");
+
+    // Use custom delegate for array items to provide per-item controls.
+    QtnPropertyDelegateInfo info;
+    info.name = "ArrayItem";
+    info.attributes["arrayIndex"] = int(index);
+    result->setDelegateInfo(info);
     result->setCallbackValueGet([index, this]() -> QString {
         PropertyArray arr = value();
         return arr.m_vecData.at(index);
@@ -42,17 +49,39 @@ QtnProperty* QtnPropertyArrayBase::createItemProperty(size_t index)
     return result;
 }
 
-void QtnPropertyArrayBase::setArray(PropertyArray array)
+void QtnPropertyArrayBase::addElement(
+    const QString& value, QtnPropertyChangeReason reason)
 {
-    if (m_array == array)
+    PropertyArray arr = this->value();
+    arr.m_vecData.push_back(value);
+    // Emitting Children change reason to force view update children
+    setValue(arr, reason | QtnPropertyChangeReasonValue | QtnPropertyChangeReasonChildren);
+}
+
+void QtnPropertyArrayBase::removeElement(
+    int index, QtnPropertyChangeReason reason)
+{
+    PropertyArray arr = this->value();
+    if (index < 0 || index >= (int)arr.m_vecData.size())
         return;
 
-    Q_EMIT propertyWillChange(QtnPropertyChangeReasonValue, &array, 0);
+    arr.m_vecData.erase(arr.m_vecData.begin() + index);
+    setValue(arr, reason | QtnPropertyChangeReasonValue | QtnPropertyChangeReasonChildren);
+}
 
-    m_array = array;
+void QtnPropertyArrayBase::moveElement(
+    int from, int to, QtnPropertyChangeReason reason)
+{
+    PropertyArray arr = this->value();
+    const int size = (int)arr.m_vecData.size();
+    if (from < 0 || from >= size || to < 0 || to >= size || from == to)
+        return;
 
-    Q_EMIT propertyDidChange(QtnPropertyChangeReasonValue);
+    const QString value = arr.m_vecData.at(from);
+    arr.m_vecData.erase(arr.m_vecData.begin() + from);
+    arr.m_vecData.insert(arr.m_vecData.begin() + to, value);
 
+    setValue(arr, reason | QtnPropertyChangeReasonValue | QtnPropertyChangeReasonChildren);
 }
 
 bool QtnPropertyArrayBase::fromStrImpl(const QString &str, QtnPropertyChangeReason reason)

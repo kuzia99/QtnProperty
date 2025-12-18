@@ -1,8 +1,14 @@
 #include "propertydelegatearray.h"
+#include "propertydelegatearrayitem.h"
 #include "PropertyArray/propertyarray.h"
 #include "QtnProperty/Delegates/PropertyDelegateFactory.h"
 #include "QtnProperty/Delegates/Utils/PropertyEditorAux.h"
 #include "QtnProperty/Delegates/Utils/PropertyEditorHandler.h"
+
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QTimer>
+#include <QToolButton>
 
 void regArrayDelegate()
 {
@@ -10,48 +16,113 @@ void regArrayDelegate()
         &QtnPropertyArrayBase::staticMetaObject,
         &qtnCreateDelegate<QtnPropertyDelegateArray, QtnPropertyArrayBase>,
         "ArrayDelegate");
+
+    // delegate for array items (QtnPropertyQStringCallback) with remove/move buttons
+    QtnPropertyDelegateArrayItem::Register(QtnPropertyDelegateFactory::staticInstance());
 }
 
-class QtnPropertyArrayLineEditBttnHandler
-    : public QtnPropertyEditorBttnHandler<QtnPropertyArrayBase,
-          QtnLineEditBttn>
+class ArrayEditorWidget : public QWidget
 {
 public:
-    QtnPropertyArrayLineEditBttnHandler(
-        QtnPropertyDelegate* delegate, QtnLineEditBttn& editor);
+    ArrayEditorWidget(QWidget* parent) : QWidget(parent)
+    {
+        auto layout = new QHBoxLayout(this);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(2);
 
-protected:
-    virtual void onToolButtonClick() override;
-    virtual void updateEditor() override;
+        label = new QLabel(this);
+        layout->addWidget(label);
+        
+        layout->addStretch();
 
-private:
-    void onToolButtonClicked(bool);
-    void onEditingFinished();
+        auto btnAdd = new QToolButton(this);
+        btnAdd->setText("+");
+        btnAdd->setAutoRaise(true);
+        layout->addWidget(btnAdd);
+        this->btnAdd = btnAdd;
+
+        auto btnRemove = new QToolButton(this);
+        btnRemove->setText("-");
+        btnRemove->setAutoRaise(true);
+        layout->addWidget(btnRemove);
+        this->btnRemove = btnRemove;
+    }
+
+    QLabel* label;
+    QToolButton* btnAdd;
+    QToolButton* btnRemove;
 };
+
+class QtnPropertyArrayEditorHandler
+    : public QtnPropertyEditorHandler<QtnPropertyArrayBase, ArrayEditorWidget>
+{
+public:
+    QtnPropertyArrayEditorHandler(
+        QtnPropertyDelegate* delegate, ArrayEditorWidget& editor)
+        : QtnPropertyEditorHandlerType(delegate, editor)
+    {
+        updateEditor();
+
+        QObject::connect(editor.btnAdd, &QToolButton::clicked, [this, delegate](){
+            property().addElement("New Element", delegate->editReason());
+        });
+
+        QObject::connect(editor.btnRemove, &QToolButton::clicked, [this, delegate](){
+             int size = (int)property().value().m_vecData.size();
+             if (size > 0)
+                property().removeElement(size - 1, delegate->editReason());
+        });
+    }
+
+    void updateEditor() override
+    {
+        QString t = QString::number(property().value().m_vecData.size()) + ":";
+        for (QString s : property().value().m_vecData)
+        {
+            t += s + ";";
+        }
+        // int size = (int)property().value().m_vecData.size();
+        editor().label->setText(t/*QString("[%1 items]").arg(size)*/);
+    }
+};
+
 
 QtnPropertyDelegateArray::QtnPropertyDelegateArray(QtnPropertyArrayBase &owner)
     : QtnPropertyDelegateTypedEx<QtnPropertyArrayBase>(owner)
 {
-    PropertyArray v = owner.value();
+    updateSubProperties();
+    m_connection = QObject::connect(&owner, &QtnPropertyBase::propertyDidChange, 
+        [this](QtnPropertyChangeReason reason){
+            // IMPORTANT:
+            // m_subProperties stores QScopedPointer<QtnPropertyBase>, so clear() destroys items.
+            // Rebuilding sub-properties on every Value change is unsafe because editors may still
+            // reference old sub-properties during commitData/updateEditor (re-entrancy) -> crash.
+            // Rebuild only when children set changed (add/remove/reindex).
+            if (reason & QtnPropertyChangeReasonChildren) {
+                updateSubProperties();
+            }
+        });
+}
 
+QtnPropertyDelegateArray::~QtnPropertyDelegateArray()
+{
+    QObject::disconnect(m_connection);
+}
+
+void QtnPropertyDelegateArray::updateSubProperties()
+{
+    m_subProperties.clear();
+
+    PropertyArray v = owner().value();
     for (size_t i = 0; i < v.m_vecData.size(); ++i)
     {
-        addSubProperty(owner.createItemProperty(i));
+        addSubProperty(owner().createItemProperty(i));
     }
 }
 
 void QtnPropertyDelegateArray::applyAttributesImpl(const QtnPropertyDelegateInfo &info)
 {
-    // PropertyArray v = owner().value();
-
-    // v.m_vecData.push_back("ddd");
-    // v.m_vecData.push_back("d");
-    // v.m_vecData.push_back("dd");
-
-    // for (size_t i = 0; i < v.m_vecData.size(); ++i)
-    // {
-    //     addSubProperty(owner().createItemProperty(i));
-    // }
+    Q_UNUSED(info);
 }
 
 void QtnPropertyDelegateArray::drawValueImpl(QStylePainter &painter, const QRect &rect) const
@@ -62,112 +133,31 @@ void QtnPropertyDelegateArray::drawValueImpl(QStylePainter &painter, const QRect
         return;
     }
 
-    QColor value = Qt::GlobalColor::darkGreen;
-
-    QRect textRect = rect;
-
-    if (1)
-    {
-        QRect colorRect = rect;
-        colorRect.setWidth(colorRect.height());
-        colorRect.adjust(2, 2, -2, -2);
-
-        painter.fillRect(colorRect,
-                         painter.style()->standardPalette().color(
-                             stateProperty()->isEditableByUser() ? QPalette::Active
-                                                                 : QPalette::Disabled,
-                             QPalette::Text));
-        colorRect.adjust(1, 1, -1, -1);
-        painter.fillRect(colorRect, value);
-
-        textRect.setLeft(colorRect.right() + 3);
-    }
-
-    if (textRect.isValid())
-    {
-        QtnPropertyDelegateTyped<QtnPropertyArrayBase>::drawValueImpl(
-            painter, textRect);
-    }
+    QString str;
+    propertyValueToStrImpl(str);
+    
+    QtnPropertyDelegateTyped<QtnPropertyArrayBase>::drawValueImpl(
+            painter, rect);
 }
 
 QWidget *QtnPropertyDelegateArray::createValueEditorImpl(QWidget *parent, const QRect &rect, QtnInplaceInfo *inplaceInfo)
 {
-    QtnLineEditBttn* editor = new QtnLineEditBttn(parent);
+    auto editor = new ArrayEditorWidget(parent);
     editor->setGeometry(rect);
 
-    new QtnPropertyArrayLineEditBttnHandler(this, *editor);
-
-    if (inplaceInfo)
-    {
-        editor->lineEdit->selectAll();
-    }
+    new QtnPropertyArrayEditorHandler(this, *editor);
 
     return editor;
 }
 
 bool QtnPropertyDelegateArray::propertyValueToStrImpl(QString &strValue) const
 {
-    return owner().toStr(strValue);
-}
-
-QtnPropertyArrayLineEditBttnHandler::QtnPropertyArrayLineEditBttnHandler(
-    QtnPropertyDelegate *delegate, QtnLineEditBttn &editor)
-    : QtnPropertyEditorHandlerType(delegate, editor)
-{
-    if (!stateProperty()->isEditableByUser())
+    QString t = QString::number(owner().value().m_vecData.size()) + ":";
+    for (QString s : owner().value().m_vecData)
     {
-        editor.lineEdit->setReadOnly(true);
-        editor.toolButton->setEnabled(false);
+        t += s + ";";
     }
-
-    QtnPropertyArrayLineEditBttnHandler::updateEditor();
-    editor.lineEdit->installEventFilter(this);
-    QObject::connect(editor.toolButton, &QToolButton::clicked, this,
-                     &QtnPropertyArrayLineEditBttnHandler::onToolButtonClicked);
-    QObject::connect(editor.lineEdit, &QLineEdit::editingFinished, this,
-                     &QtnPropertyArrayLineEditBttnHandler::onEditingFinished);
-}
-
-void QtnPropertyArrayLineEditBttnHandler::onToolButtonClick()
-{
-    onToolButtonClicked(false);
-}
-
-void QtnPropertyArrayLineEditBttnHandler::updateEditor()
-{
-    QString str;
-    property().toStr(str);
-    editor().setTextForProperty(stateProperty(), str);
-    editor().lineEdit->selectAll();
-}
-
-void QtnPropertyArrayLineEditBttnHandler::onToolButtonClicked(bool)
-{
-    // auto property = &this->property();
-    // volatile bool destroyed = false;
-    // auto connection = QObject::connect(property, &QObject::destroyed,
-    //                                    [&destroyed]() mutable { destroyed = true; });
-    // reverted = true;
-    // auto dialog = new QColorDialog(property->value(), editorBase());
-    // auto dialogContainer = connectDialog(dialog);
-
-    // if (dialog->exec() == QDialog::Accepted && !destroyed)
-    // {
-    //     property->setValue(dialog->currentColor(), delegate()->editReason());
-    // }
-
-    // if (!destroyed)
-    //     QObject::disconnect(connection);
-
-    // Q_UNUSED(dialogContainer);
-}
-
-void QtnPropertyArrayLineEditBttnHandler::onEditingFinished()
-{
-    if (canApply())
-    {
-        property().fromStr(editor().lineEdit->text(), delegate()->editReason());
-    }
-
-    applyReset();
+    // size_t size = owner().value().m_vecData.size();
+    strValue = t;//QString("[%1 items]").arg(size);
+    return true;
 }

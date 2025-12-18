@@ -11,6 +11,7 @@ SOURCES +=  main.cpp\
             MainWindow.cpp \
             PropertyArray/propertyarray.cpp \
             PropertyArray/propertydelegatearray.cpp \
+            PropertyArray/propertydelegatearrayitem.cpp \
             mydialog.cpp \
             AB/PropertyABColor.cpp \
             AB/PropertyDelegateABColor.cpp \
@@ -25,6 +26,7 @@ SOURCES +=  main.cpp\
 HEADERS  += MainWindow.h \
             PropertyArray/propertyarray.h \
             PropertyArray/propertydelegatearray.h \
+            PropertyArray/propertydelegatearrayitem.h \
             mydialog.h \
             AB/PropertyABColor.h \
             AB/PropertyDelegateABColor.h \

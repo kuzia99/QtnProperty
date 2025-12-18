@@ -1,6 +1,8 @@
 #pragma once
 #include "QtnProperty/Delegates/Utils/PropertyDelegateMisc.h"
 
+#include <QObject>
+
 class QtnPropertyArrayBase;
 
 class QtnPropertyDelegateArray
@@ -10,6 +12,7 @@ class QtnPropertyDelegateArray
 
 public:
     QtnPropertyDelegateArray(QtnPropertyArrayBase& owner);
+    ~QtnPropertyDelegateArray();
 
 protected:
     void applyAttributesImpl(
@@ -22,4 +25,8 @@ protected:
         QtnInplaceInfo* inplaceInfo = nullptr) override;
 
     bool propertyValueToStrImpl(QString& strValue) const override;
+
+private:
+    void updateSubProperties();
+    QMetaObject::Connection m_connection;
 };
